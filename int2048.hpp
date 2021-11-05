@@ -20,16 +20,16 @@ namespace sjtu {
   class int2048 {
    private:
     using SegType = std::uint_fast32_t;
-    static constexpr SegType SEG_MAX = 1000000000;
-    using TmpType = std::int_fast64_t;
+    static constexpr SegType EXP10[10] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
     static constexpr int SEG_LENGTH = 9;
-    static constexpr int EXP10[10] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+    static constexpr SegType SEG_MAX = EXP10[SEG_LENGTH];
+    using TmpType = std::int_fast64_t;
     /// Little-endian.
     std::vector<SegType> segments_;
     /// True if negative.
     bool signbit_ = false;
 
-    SegType ninesComplement_ (const SegType &number) { return SEG_MAX - number - 1; }
+    static SegType ninesComplement_ (const SegType &number) { return SEG_MAX - number - 1; }
 
     int2048 &addValue_ (const int2048 &that) {
       const int szThis = segments_.size();
@@ -74,15 +74,15 @@ namespace sjtu {
       }
       if (take) {
         signbit_ = !signbit_;
-        for (auto it = segments_.begin(); it != segments_.end(); ++it) {
-          *it = ninesComplement_(*it);
+        for (auto &seg : segments_) {
+          seg = ninesComplement_(seg);
         }
-        for (auto it = segments_.begin(); it != segments_.end(); ++it) {
-          if (*it < SEG_MAX - 1) {
-            ++(*it);
+        for (auto &seg : segments_) {
+          if (seg < SEG_MAX - 1) {
+            ++seg;
             break;
           }
-          *it = 0;
+          seg = 0;
         }
       }
       if (segments_.back() == 0) segments_.pop_back();
@@ -108,9 +108,8 @@ namespace sjtu {
     int2048 (const std::string &string) {
       read(string);
     }
-    int2048 (const int2048 &other) {
-      segments_ = other.segments_;
-      signbit_ = other.signbit_;
+    int2048 (const int2048 &that) {
+      *this = that;
     }
 
     void read (const std::string &string) {
@@ -142,13 +141,75 @@ namespace sjtu {
       if (current != 0) segments_.push_back(current);
     }
     void print () const {
+      std::cout << *this;
+    }
+
+    int2048 &add (const int2048 &that) {
+      return signbit_ == that.signbit_ ? addValue_(that) : subValue_(that);
+    }
+    friend int2048 &add (const int2048 &a, const int2048 &b) {
+      return a + b;
+    }
+
+    int2048 &minus (const int2048 &that) {
+      return signbit_ != that.signbit_ ? addValue_(that) : subValue_(that);
+    }
+    friend int2048 &minus (const int2048 &a, const int2048 &b) {
+      return a - b;
+    }
+
+    // =================================== Integer2 ===================================
+
+    int2048 &operator= (const int2048 &that) {
+      segments_ = that.segments_;
+      signbit_ = that.signbit_;
+      return *this;
+    }
+
+    int2048 &operator+= (const int2048 &that) {
+      return add(that);
+    }
+    friend int2048 &operator+ (const int2048 &a, const int2048 &b) {
+      return (new int2048(a))->add(b);
+    }
+
+    int2048 &operator-= (const int2048 &that) {
+      return minus(that);
+    }
+    friend int2048 &operator- (const int2048 &a, const int2048 &b) {
+      return (new int2048(a))->minus(b);
+    }
+
+    int2048 &operator*= (const int2048 &that) {
+      // TODO
+      return *this;
+    }
+    friend int2048 &operator* (const int2048 &a, const int2048 &b) {
+      return *(new int2048(a)) *= b;
+    }
+
+    int2048 &operator/= (const int2048 &that) {
+      // TODO
+      return *this;
+    }
+    friend int2048 &operator/ (const int2048 &a, const int2048 &b) {
+      return *(new int2048(a)) /= b;
+    }
+
+    friend std::istream &operator>> (std::istream &stream, int2048 &number) {
+      std::string str;
+      stream >> str;
+      number.read(str);
+      return stream;
+    }
+    friend std::ostream &operator<< (std::ostream &stream, const int2048 &number) {
+      if (number.signbit_ && (number.segments_.size() > 1 || number.segments_[0] > 0)) stream << '-';
       bool firstSegment = true;
-      if (signbit_ && (segments_.size() != 0 || segments_[0] != 0)) std::cout << '-';
-      for (auto it = segments_.rbegin(); it != segments_.rend(); ++it) {
+      for (auto it = number.segments_.rbegin(); it != number.segments_.rend(); ++it) {
         const auto &seg = *it;
         if (firstSegment) {
           firstSegment = false;
-          std::cout << seg;
+          stream << seg;
         } else {
           char str[SEG_LENGTH + 1];
           str[SEG_LENGTH] = '\0';
@@ -157,50 +218,36 @@ namespace sjtu {
             str[i] = (current % 10) + '0';
             current /= 10;
           }
-          std::cout << str;
+          stream << str;
         }
       }
+      return stream;
     }
 
-    int2048 &add (const int2048 &that) {
-      return signbit_ == that.signbit_ ? addValue_(that) : subValue_(that);
+    inline friend bool operator== (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
     }
-    friend int2048 add (int2048 a, const int2048 &b) {
-      return (new int2048(a))->add(b);
+    inline friend bool operator!= (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
     }
-
-    int2048 &minus (const int2048 &that) {
-      return signbit_ != that.signbit_ ? addValue_(that) : subValue_(that);
+    inline friend bool operator< (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
     }
-    friend int2048 minus (int2048 a, const int2048 &b) {
-      return (new int2048(a))->minus(b);
+    inline friend bool operator> (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
     }
-
-    // =================================== Integer2 ===================================
-
-    int2048 &operator= (const int2048 &) {}
-
-    int2048 &operator+= (int2048);
-    friend int2048 operator+ (int2048, const int2048 &) {}
-
-    int2048 &operator-= (int2048) {}
-    friend int2048 operator- (int2048, const int2048 &) {}
-
-    int2048 &operator*= (const int2048 &) {}
-    friend int2048 operator* (int2048, const int2048 &) {}
-
-    int2048 &operator/= (const int2048 &) {}
-    friend int2048 operator/ (int2048, const int2048 &) {}
-
-    friend std::istream &operator>> (std::istream &, int2048 &) {}
-    friend std::ostream &operator<< (std::ostream &, const int2048 &) {}
-
-    inline friend bool operator== (const int2048 &, const int2048 &) {}
-    inline friend bool operator!= (const int2048 &, const int2048 &) {}
-    inline friend bool operator< (const int2048 &, const int2048 &) {}
-    inline friend bool operator> (const int2048 &, const int2048 &) {}
-    inline friend bool operator<= (const int2048 &, const int2048 &) {}
-    inline friend bool operator>= (const int2048 &, const int2048 &) {}
+    inline friend bool operator<= (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
+    }
+    inline friend bool operator>= (const int2048 &, const int2048 &) {
+      // TODO
+      return true;
+    }
   };
 }
 
