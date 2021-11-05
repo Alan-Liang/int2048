@@ -29,13 +29,17 @@ fi
 
 mkdir -p .tmp
 cp int2048.hpp .tmp/
+SRC=".tmp/main.cpp"
+EXE=".tmp/main"
+OUT=".tmp/outfile"
 for CODEFILE in "${INFILES[@]}"; do
   echo "Testing '$CODEFILE'..."
-  cp "$CODEFILE" .tmp/main.cpp
-  g++ $CXXFLAGS ".tmp/main.cpp" -o .tmp/main --debug || exit 1
+  cp "$CODEFILE" "$SRC"
+  g++ $CXXFLAGS "$SRC" -o "$EXE" --debug || exit 1
   INFILE=$(echo $CODEFILE | sed 's/cpp/in/')
   OUTFILE=$(echo $CODEFILE | sed 's/cpp/out/')
   if [ ! -e "$INFILE" ]; then INFILE="/dev/null"; fi
-  time .tmp/main < "$INFILE" > .tmp/outfile
-  diff .tmp/outfile "$OUTFILE" || exit 1
+  if [ -n "$VALGRIND" ]; then EXE="valgrind $EXE"; fi
+  time $EXE < "$INFILE" > "$OUT"
+  diff "$OUT" "$OUTFILE" || exit 1
 done
