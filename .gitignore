@@ -7,3 +7,6 @@ note.md
 /**/*.py
 /**/__pycache__
 /**/*.ans
+
+.tmp
+int2048.cpp
