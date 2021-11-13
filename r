@@ -30,10 +30,10 @@ fi
 mkdir -p .tmp
 cp int2048.hpp .tmp/
 SRC=".tmp/main.cpp"
-EXE=".tmp/main"
 OUT=".tmp/outfile"
 for CODEFILE in "${INFILES[@]}"; do
   echo "Testing '$CODEFILE'..."
+  EXE=".tmp/main"
   cp "$CODEFILE" "$SRC"
   g++ $CXXFLAGS "$SRC" -o "$EXE" --debug || exit 1
   INFILE=$(echo $CODEFILE | sed 's/cpp/in/')
