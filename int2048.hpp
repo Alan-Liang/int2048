@@ -67,7 +67,7 @@ class int2048 {
     if (i >= segments_.size()) return 0;
     return segments_[i];
   }
-  /// Subtracts that from this in place, with optional left shift of SEG_MAX, disregarding sign bit.
+  /// Subtracts that from this in place, with optional left shift of that by SEG_MAX, disregarding sign bit.
   int2048 &subValue_ (const int2048 &that, bool lshift = false) {
     const int szThis = segments_.size();
     const int szThat = that.segments_.size() + (lshift ? 1 : 0);
@@ -385,57 +385,36 @@ class int2048 {
     return stream;
   }
 
-  inline friend bool operator== (const int2048 &a, const int2048 &b) {
-    if (a.isNull_()) return b.isNull_();
-    if (b.isNull_()) return false;
-    if (a.signbit_ != b.signbit_) return false;
-    if (a.segments_.size() != b.segments_.size()) return false;
-    int sz = a.segments_.size();
-    for (int i = 0; i < sz; ++i) {
-      if (a.segments_[i] != b.segments_[i]) return false;
-    }
-    return true;
-  }
-  inline friend bool operator!= (const int2048 &a, const int2048 &b) {
-    return !(a == b);
-  }
-  inline friend bool operator< (const int2048 &lhs, const int2048 &rhs) {
-    if (lhs.isNull_()) {
-      if (rhs.isNull_()) return false;
-      return !rhs.signbit_;
-    }
-    if (rhs.isNull_()) return lhs.signbit_;
-    if (lhs.signbit_ != rhs.signbit_) return lhs.signbit_;
+ private:
+  /// -1 if lhs < rhs, 0 if lhs = rhs, 1 if lhs > rhs; ignores sign bit. Requires lhs and rhs be not null.
+  static int cmpValue_ (const int2048 &lhs, const int2048 &rhs) {
     const int szLhs = lhs.segments_.size();
     const int szRhs = rhs.segments_.size();
-    if (szLhs != szRhs) return lhs.signbit_ ? (szLhs > szRhs) : (szLhs < szRhs);
+    if (szLhs != szRhs) return cmp_(szLhs, szRhs);
     for (int i = szLhs - 1; i >= 0; --i) {
-      if (lhs.segments_[i] != rhs.segments_[i]) return lhs.signbit_ ? (lhs.segments_[i] > rhs.segments_[i]) : (lhs.segments_[i] < rhs.segments_[i]);
+      int sgn = cmp_(lhs.segments_[i], rhs.segments_[i]);
+      if (sgn != 0) return sgn;
     }
-    return false;
+    return 0;
   }
-  // TODO(refactor): remove dup code
-  inline friend bool operator> (const int2048 &lhs, const int2048 &rhs) {
-    if (lhs.isNull_()) {
-      if (rhs.isNull_()) return false;
-      return rhs.signbit_;
-    }
-    if (rhs.isNull_()) return !lhs.signbit_;
-    if (lhs.signbit_ != rhs.signbit_) return rhs.signbit_;
-    const int szLhs = lhs.segments_.size();
-    const int szRhs = rhs.segments_.size();
-    if (szLhs != szRhs) return lhs.signbit_ ? (szLhs < szRhs) : (szLhs > szRhs);
-    for (int i = szLhs - 1; i >= 0; --i) {
-      if (lhs.segments_[i] != rhs.segments_[i]) return lhs.signbit_ ? (lhs.segments_[i] < rhs.segments_[i]) : (lhs.segments_[i] > rhs.segments_[i]);
-    }
-    return false;
+  /// -1 if lhs < rhs, 0 if lhs = rhs, 1 if lhs > rhs
+  static int cmp_ (const SegType &lhs, const SegType &rhs) {
+    return lhs == rhs ? 0 : lhs < rhs ? -1 : 1;
   }
-  inline friend bool operator<= (const int2048 &lhs, const int2048 &rhs) {
-    return lhs < rhs || lhs == rhs;
+  /// -1 if lhs < rhs, 0 if lhs = rhs, 1 if lhs > rhs
+  static int cmp_ (const int2048 &lhs, const int2048 &rhs) {
+    if (lhs.isNull_()) return rhs.isNull_() ? 0 : rhs.signbit_ ? 1 : -1;
+    if (rhs.isNull_() || lhs.signbit_ != rhs.signbit_) return lhs.signbit_ ? -1 : 1;
+    return lhs.signbit_ ? -cmpValue_(lhs, rhs) : cmpValue_(lhs, rhs);
   }
-  inline friend bool operator>= (const int2048 &lhs, const int2048 &rhs) {
-    return lhs > rhs || lhs == rhs;
-  }
+
+ public:
+  inline friend bool operator== (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) == 0; }
+  inline friend bool operator!= (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) != 0; }
+  inline friend bool operator<  (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) <  0; }
+  inline friend bool operator>  (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) >  0; }
+  inline friend bool operator<= (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) <= 0; }
+  inline friend bool operator>= (const int2048 &lhs, const int2048 &rhs) { return cmp_(lhs, rhs) >= 0; }
 };
 } // namespace sjtu
 
