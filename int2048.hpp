@@ -118,6 +118,12 @@ class int2048 {
     signbit_ = false;
     segments_.clear();
   }
+  /// Resets this to number, returns this.
+  int2048 &resetTo_ (const SegType &number) {
+    reset_();
+    segments_.push_back(number);
+    return *this;
+  }
 
   /// True if this is 0.
   bool isNull_ () const {
@@ -222,12 +228,7 @@ class int2048 {
   int2048 &operator*= (const int2048 &that) {
     // https://treskal.com/s/masters-thesis.pdf, Algorithm 2.3. Retrieved 2021/11/12.
     if (isNull_()) return *this;
-    if (that.isNull_()) {
-      segments_.clear();
-      segments_.push_back(0);
-      signbit_ = false;
-      return *this;
-    }
+    if (that.isNull_()) return resetTo_(0);
     if (that.signbit_) signbit_ = !signbit_;
     int2048 thatSnapshot = that;
     std::vector<SegType> result;
@@ -314,18 +315,9 @@ class int2048 {
     assert(!that.isNull_());
     if (isNull_()) return *this;
     assert(!signbit_ && !that.signbit_);
+    if (*this < that) return resetTo_(0);
     const int szThis = segments_.size();
     const int szThat = that.segments_.size();
-    if (szThis < szThat) {
-      reset_();
-      segments_.push_back(0);
-      return *this;
-    }
-    if (szThis == szThat && *this < that) {
-      reset_();
-      segments_.push_back(0);
-      return *this;
-    }
     if (that.segments_.back() < SEG_MAX / 2) {
       TmpType mul = SEG_MAX / 2 / that.segments_.back() + 1;
       int2048 newDividend = that;
@@ -333,11 +325,7 @@ class int2048 {
       newDividend *= mul;
       return *this /= newDividend;
     }
-    if (szThis == szThat) {
-      reset_();
-      segments_.push_back(1);
-      return *this;
-    }
+    if (szThis == szThat) return resetTo_(1);
     if (szThis == szThat + 1) return *this = std::move(divSubroutine_(*this, that).quotient);
     auto shifted = rshift_(szThis - szThat - 1);
     auto higher = divSubroutine_(shifted.quotient, that);
