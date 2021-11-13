@@ -11,6 +11,7 @@
 #include <cstdint>
 
 #ifdef ONLINE_JUDGE
+// using `sizeof` here to suppress annoying warnings on unused variables, etc.
 #define assert(...) sizeof(__VA_ARGS__)
 #else
 #include <cassert>
@@ -18,7 +19,7 @@
 
 namespace sjtu {
 class int2048 {
-  private:
+ private:
   using SegType = std::uint_fast32_t;
   static constexpr SegType EXP10[10] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
   static constexpr int SEG_LENGTH = 9;
@@ -31,9 +32,11 @@ class int2048 {
 
   static SegType ninesComplement_ (const SegType &number) { return SEG_MAX - number - 1; }
 
+  /// Strip leading zeroes.
   void normalize_ () {
     while (segments_.back() == 0) segments_.pop_back();
   }
+  /// Adds values of this and that in place, disregarding sign bit.
   int2048 &addValue_ (const int2048 &that) {
     const int szThis = segments_.size();
     const int szThat = that.segments_.size();
@@ -54,6 +57,7 @@ class int2048 {
     if (carry != 0) segments_.push_back(carry);
     return *this;
   }
+  /// Gets the segment at index with optional left shift of SEG_MAX with bound checks.
   const SegType seg_ (const int &i, const bool &lshift = false) const {
     if (lshift) {
       if (i == 0) return 0;
@@ -63,20 +67,21 @@ class int2048 {
     if (i >= segments_.size()) return 0;
     return segments_[i];
   }
+  /// Subtracts that from this in place, with optional left shift of SEG_MAX, disregarding sign bit.
   int2048 &subValue_ (const int2048 &that, bool lshift = false) {
     const int szThis = segments_.size();
     const int szThat = that.segments_.size() + (lshift ? 1 : 0);
     const int szMax = szThat > szThis ? szThat : szThis;
-    TmpType take = 0;
+    TmpType borrow = 0;
     for (int i = 0; i < szMax; ++i) {
       const TmpType segThis = i < szThis ? segments_[i] : 0;
       const TmpType segThat = i < szThat ? that.seg_(i, lshift) : 0;
-      TmpType difference = segThis - segThat - take;
+      TmpType difference = segThis - segThat - borrow;
       if (difference < 0) {
-        take = 1;
+        borrow = 1;
         difference += SEG_MAX;
       } else {
-        take = 0;
+        borrow = 0;
       }
       if (i < szThis) {
         segments_[i] = difference;
@@ -84,7 +89,15 @@ class int2048 {
         segments_.push_back(difference);
       }
     }
-    if (take) {
+    if (borrow) {
+      /* this happens when abs(that) > abs(this).
+           abs(a - b) = b - a
+         = -(SEG_MAX ** size + a - b) + SEG_MAX ** size
+         = (SEG_MAX ** size - 1) - (SEG_MAX ** size + a - b) + 1.
+         SEG_MAX ** size + a - b is what we currently have in this.
+         SEG_MAX ** size - 1 is a series of 9s, so ((SEG_MAX ** size - 1) - this) is the nine's complement of this.
+         using nine's complement here because it never borrows.
+         we need to add one to the complement to get the result. */
       signbit_ = !signbit_;
       for (auto &seg : segments_) {
         seg = ninesComplement_(seg);
@@ -100,19 +113,25 @@ class int2048 {
     normalize_();
     return *this;
   }
+  /// Resets the sign bit and the segments to their initial states.
   void reset_ () {
     signbit_ = false;
     segments_.clear();
   }
 
+  /// True if this is 0.
   bool isNull_ () const {
     return segments_.size() == 1 && segments_[0] == static_cast<SegType>(0);
   }
-  public:
+
+ public:
   int2048 () {
     segments_.push_back(0);
   }
   int2048 (long long number) : signbit_(number < 0) {
+    /* do not use `-number` here, because negating LLONG_MIN is undefined behavior.
+       See: https://github.com/python/cpython/blob/4c792f39e688b11c7c19e411ed4f76a7baa44638/Objects/longobject.c#L191-L192
+       See: https://acm.sjtu.app/t/145 */
     unsigned long long current = number > 0 ? number : 0ULL - number;
     while (current > 0) {
       segments_.push_back(current % SEG_MAX);
@@ -126,13 +145,15 @@ class int2048 {
   int2048 (const int2048 &that) {
     *this = that;
   }
-  int2048 (const int2048 &&that) {
+  int2048 (int2048 &&that) {
+    // TODO: test if it works.
     segments_ = std::move(that.segments_);
     signbit_ = that.signbit_;
   }
 
   void read (const std::string &string) {
     reset_();
+    // this is not IEEE 754. There are no negative zeroes.
     if (string == "-0" || string == "" || string == "0") {
       segments_.push_back(0);
       return;
@@ -177,8 +198,6 @@ class int2048 {
     return minuend - subtrahend;
   }
 
-  // =================================== Integer2 ===================================
-
   int2048 &operator= (const int2048 &that) {
     segments_ = that.segments_;
     signbit_ = that.signbit_;
@@ -189,6 +208,7 @@ class int2048 {
     return add(that);
   }
   friend int2048 &operator+ (const int2048 &a, const int2048 &b) {
+    // TODO: are there ways to implement this without using `new`, `malloc`, or their relatives?
     return (new int2048(a))->add(b);
   }
 
@@ -271,6 +291,7 @@ class int2048 {
     res.remainder -= t;
     return res;
   }
+  /// Right shifts by SEG_MAX ** cntSegments, and returns quotient and remainder.
   DivisionResult_<int2048> rshift_ (int cntSegments) const {
     DivisionResult_<int2048> res;
     res.remainder.reset_();
@@ -283,6 +304,7 @@ class int2048 {
       ++it;
     }
     for (; it != segments_.end(); ++it) res.quotient.segments_.push_back(*it);
+    // no need to normalize quotient here.
     res.remainder.normalize_();
     return res;
   }
